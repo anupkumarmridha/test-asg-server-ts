@@ -7,31 +7,42 @@ pipeline {
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Checkout') {
+            when {
+                anyOf {
+                    branch 'dev'
+                    branch 'main'
+                }
+            }
             steps {
                 checkout scm
             }
         }
 
         stage('Build Docker Image') {
+            when {
+                branch 'dev'
+            }
             steps {
+                echo "🔧 Building image for dev branch (no push)"
                 sh "docker build -t $DOCKER_IMAGE:$IMAGE_TAG ."
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Build and Push Docker Image') {
+            when {
+                branch 'main'
+            }
             steps {
+                echo "🚀 Building and pushing image for main branch"
+                sh "docker build -t $DOCKER_IMAGE:$IMAGE_TAG ."
                 withCredentials([usernamePassword(
-                    credentialsId: 'docker', 
-                    usernameVariable: 'DOCKER_USER', 
-                    passwordVariable: 'DOCKER_PASS')]) {
+                    credentialsId: 'docker',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
                 sh "docker push $DOCKER_IMAGE:$IMAGE_TAG"
             }
         }
@@ -39,10 +50,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Successfully pushed: $DOCKER_IMAGE:$IMAGE_TAG"
+            echo "✅ Success on branch: ${env.BRANCH_NAME}"
         }
         failure {
-            echo "❌ Build failed"
+            echo "❌ Failure on branch: ${env.BRANCH_NAME}"
         }
     }
 }
