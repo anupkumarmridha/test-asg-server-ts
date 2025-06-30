@@ -56,23 +56,21 @@ pipeline {
         }
 
         stage('Build & Push Docker Image (main only)') {
-            when {
-                allOf {
-                    branch 'main'
-                    not { expression { return env.BRANCH_NAME.startsWith('v') } }
-                }
-            }
+            when { branch 'main' }
             steps {
                 sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
                 withCredentials([usernamePassword(
-                    credentialsId: 'docker',
+                    credentialsId: 'docker-hub-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS')]) {
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
                 sh "docker push ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest"
+                sh "docker push ${DOCKER_IMAGE}:latest"
             }
         }
+
 
         // Only tag if NOT already a tag build!
         stage('Create & Push Git Tag (main only)') {
