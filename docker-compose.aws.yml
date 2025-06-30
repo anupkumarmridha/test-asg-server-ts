@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  test-asg-server-ts:
+    build:
+      context: .
+      dockerfile: Dockerfile.aws
+    container_name: test-asg-server-ts-aws
+    ports:
+      - "8080:3000"
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - USE_AWS_SECRETS=true
+      - DB_PROVIDER=aws-rds
+      - DB_TYPE=mysql
+      - AWS_SECRET_NAME=${AWS_SECRET_NAME:-anup-training-dev-db-credentials}
+      - AWS_RDS_REGION=${AWS_RDS_REGION:-us-east-1}
+      # AWS credentials will be provided by IAM role in production
+      # For local testing with AWS, uncomment and provide these:
+      # - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      # - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      # - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      
+      # Fallback configuration if AWS Secrets Manager fails
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-test_asg_db}
+      - DB_USER=${DB_USER:-mysql_user}
+      - DB_PASSWORD=${DB_PASSWORD:-mysql_password}
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:' + process.env.PORT + '/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

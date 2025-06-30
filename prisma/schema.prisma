@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model HealthCheck {
+  id        Int      @id @default(autoincrement())
+  status    String
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  @@map("health_check")
+}
+
+model SystemStatus {
+  id           Int      @id @default(autoincrement())
+  serviceName  String   @map("service_name")
+  status       String
+  responseTime Int?     @map("response_time")
+  errorMessage String?  @map("error_message") @db.Text
+  checkedAt    DateTime @default(now()) @map("checked_at")
+
+  @@map("system_status")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("user")
+}
