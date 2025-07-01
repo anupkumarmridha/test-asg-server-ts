@@ -71,6 +71,87 @@ pipeline {
             }
         }
 
+        stage('Refresh ASG Instances (main only)') {
+            when { branch 'main' }
+            steps {
+                script {
+                    // Wait a moment for Docker Hub to process the image
+                    sleep(30)
+                    
+                    // Define your ASG name and region (update these to match your Terraform setup)
+                    def asgName = 'anup-training-dev-asg' 
+                    def region = 'us-east-1'
+                    
+                    echo "🔄 Starting ASG Instance Refresh for new Docker image..."
+                    
+                    try {
+                        // First, verify the ASG exists
+                        def asgExists = sh(
+                            script: """
+                                aws autoscaling describe-auto-scaling-groups \\
+                                    --auto-scaling-group-names ${asgName} \\
+                                    --region ${region} \\
+                                    --query 'length(AutoScalingGroups)' \\
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (asgExists == "0") {
+                            throw new Exception("ASG '${asgName}' not found in region '${region}'")
+                        }
+                        
+                        echo "✅ Found ASG: ${asgName}"
+                        
+                        // Start the instance refresh
+                        sh """
+                            aws autoscaling start-instance-refresh \\
+                                --auto-scaling-group-name ${asgName} \\
+                                --region ${region} \\
+                                --preferences '{
+                                    "InstanceWarmup": 300,
+                                    "MinHealthyPercentage": 50,
+                                    "CheckpointPercentages": [50, 100],
+                                    "CheckpointDelay": 600,
+                                    "SkipMatching": false
+                                }' \\
+                                --desired-configuration '{
+                                    "LaunchTemplate": {
+                                        "Version": "\$Latest"
+                                    }
+                                }'
+                        """
+                        
+                        echo "✅ ASG Instance Refresh initiated successfully!"
+                        echo "🔗 Monitor progress in AWS Console: Auto Scaling Groups → ${asgName} → Instance refresh"
+                        
+                    } catch (Exception e) {
+                        echo "❌ Failed to refresh ASG instances: ${e.getMessage()}"
+                        echo "📋 Please check:"
+                        echo "   • ASG name: ${asgName}"
+                        echo "   • AWS region: ${region}"
+                        echo "   • Jenkins IAM permissions"
+                        echo "   • Launch template exists and is latest version"
+                        
+                        // List available ASGs for debugging
+                        try {
+                            echo "🔍 Available ASGs in region ${region}:"
+                            sh """
+                                aws autoscaling describe-auto-scaling-groups \\
+                                    --region ${region} \\
+                                    --query 'AutoScalingGroups[].AutoScalingGroupName' \\
+                                    --output table
+                            """
+                        } catch (Exception listError) {
+                            echo "Could not list ASGs: ${listError.getMessage()}"
+                        }
+                        
+                        throw e
+                    }
+                }
+            }
+        }
+
 
         // Only tag if NOT already a tag build!
         stage('Create & Push Git Tag (main only)') {
@@ -97,7 +178,15 @@ pipeline {
     }
 
     post {
-        success { echo "✅ Success on ${env.BRANCH_NAME} – produced ${IMAGE_TAG}" }
+        success { 
+            script {
+                if (env.BRANCH_NAME == 'main') {
+                    echo "🎉 SUCCESS: Built ${IMAGE_TAG}, pushed to Docker Hub, and triggered ASG refresh!"
+                } else {
+                    echo "✅ Success on ${env.BRANCH_NAME} – produced ${IMAGE_TAG}"
+                }
+            }
+        }
         failure { echo "❌ Failure on ${env.BRANCH_NAME}" }
     }
 }

@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AutoScalingGroupRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "autoscaling:StartInstanceRefresh",
+        "autoscaling:DescribeInstanceRefreshes",
+        "autoscaling:DescribeAutoScalingGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFormationRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:ListExports"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
