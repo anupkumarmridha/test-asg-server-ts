@@ -71,6 +71,7 @@ pipeline {
             }
         }
 
+        /*
         stage('Refresh ASG Instances (main only)') {
             when { branch 'main' }
             steps {
@@ -162,6 +163,18 @@ pipeline {
                         throw e
                     }
                 }
+            }
+        }
+        */
+
+        stage('Rolling Update ASG Instances with Ansible') {
+            when { branch 'main' }
+            steps {
+                echo "🚀 Running Ansible playbook to update Docker containers on all ASG instances..."
+                sh '''
+                ansible-playbook -i localhost, asg-docker-rolling-update.yml \
+                  --extra-vars "asg_name=anup-training-dev-asg region=us-east-1"
+                '''
             }
         }
 
