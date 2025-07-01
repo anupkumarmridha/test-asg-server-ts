@@ -172,7 +172,7 @@ pipeline {
             steps {
                 echo "🚀 Running Ansible playbook to update Docker containers on all ASG instances..."
                 sh '''
-                ansible-playbook -i localhost,  /etc/ansible/playbooks/asg-docker-rolling-update.yml \
+                ansible-playbook -i localhost, asg-docker-rolling-update.yml \
                   --extra-vars "asg_name=anup-training-dev-asg region=us-east-1"
                 '''
             }

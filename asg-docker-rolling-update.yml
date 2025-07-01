@@ -1,0 +1,72 @@
+---
+- name: Get ASG instance IPs and update Docker containers
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    asg_name: "{{ asg_name | default('anup-training-dev-asg') }}"
+    region: "{{ region | default('us-east-1') }}"
+
+  tasks:
+    - name: Get ASG info
+      amazon.aws.ec2_asg_info:
+        region: "{{ region }}"
+        name: "{{ asg_name }}"
+      register: asg_info
+
+    - name: Debug ASG info structure
+      debug:
+        var: asg_info
+      when: asg_info is defined
+
+    - name: Get instance IDs from ASG
+      set_fact:
+        instance_ids: "{{ asg_info.results[0].instances | map(attribute='instance_id') | list }}"
+      when: asg_info.results is defined and asg_info.results | length > 0
+
+    - name: Fallback - try different ASG structure
+      set_fact:
+        instance_ids: "{{ asg_info.auto_scaling_groups[0].instances | map(attribute='instance_id') | list }}"
+      when: asg_info.auto_scaling_groups is defined and asg_info.auto_scaling_groups | length > 0
+
+    - name: Debug instance IDs
+      debug:
+        var: instance_ids
+
+    - name: Fail if no instances found
+      fail:
+        msg: "No instances found in ASG {{ asg_name }}"
+      when: instance_ids is not defined or instance_ids | length == 0
+
+    - name: Get instance info
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        instance_ids: "{{ instance_ids }}"
+      register: ec2_info
+
+    - name: Add instances to dynamic group
+      add_host:
+        name: "{{ item.public_ip_address | default(item.private_ip_address) }}"
+        groups: asg_hosts
+        ansible_host: "{{ item.private_ip_address }}"
+        instance_id: "{{ item.instance_id }}"
+      loop: "{{ ec2_info.instances }}"
+      when: ec2_info.instances is defined
+
+- name: Update Docker containers on ASG instances
+  hosts: asg_hosts
+  become: yes
+  gather_facts: no
+  vars:
+    ansible_connection: community.aws.aws_ssm
+    ansible_aws_ssm_region: "{{ region | default('us-east-1') }}"
+    ansible_aws_ssm_instance_id: "{{ hostvars[inventory_hostname]['instance_id'] }}"
+  tasks:
+    - name: Pull latest Docker image and restart app
+      shell: |
+        cd /app && docker-compose pull app && docker-compose up -d app
+      register: docker_update_result
+
+    - name: Show Docker update result
+      debug:
+        var: docker_update_result.stdout_lines
