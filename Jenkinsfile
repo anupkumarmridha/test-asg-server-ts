@@ -103,6 +103,18 @@ pipeline {
                         
                         echo "✅ Found ASG: ${asgName}"
                         
+                        // Get the LaunchTemplateName dynamically from the ASG
+                        def launchTemplateName = sh(
+                            script: """
+                                aws autoscaling describe-auto-scaling-groups \\
+                                    --auto-scaling-group-names ${asgName} \\
+                                    --region ${region} \\
+                                    --query 'AutoScalingGroups[0].LaunchTemplate.LaunchTemplateName' \\
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        echo "✅ Using Launch Template: ${launchTemplateName}"
                         // Start the instance refresh
                         sh """
                             aws autoscaling start-instance-refresh \\
@@ -117,6 +129,7 @@ pipeline {
                                 }' \\
                                 --desired-configuration '{
                                     "LaunchTemplate": {
+                                        "LaunchTemplateName": "${launchTemplateName}",
                                         "Version": "\$Latest"
                                     }
                                 }'
