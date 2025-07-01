@@ -93,7 +93,7 @@ let nextId = 4;
 
 app.get('/', (req: Request, res: Response) => {
   const welcomeData = {
-    message: 'Welcome to test-asg-server-ts',
+    message: 'Welcome to CI/CD test-asg-server-ts',
     status: 'running',
     timestamp: new Date().toISOString(),
     version: config.app.version,
