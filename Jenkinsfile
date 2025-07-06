@@ -170,6 +170,10 @@ pipeline {
         stage('Rolling Update ASG Instances with Ansible') {
             when { branch 'main' }
             steps {
+                echo "🚀 Installing boto3 and botocore for Ansible AWS modules..."
+                sh '''
+                pip3 install --user boto3 botocore
+                '''
                 echo "🚀 Running Ansible playbook to update Docker containers on all ASG instances..."
                 sh '''
                 ansible-playbook -i localhost, asg-docker-rolling-update.yml \
