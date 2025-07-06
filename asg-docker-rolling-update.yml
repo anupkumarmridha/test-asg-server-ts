@@ -46,7 +46,7 @@
         ansible_host: "{{ item.network_interfaces[0].private_ip_address }}"
         ansible_user: ec2-user
         ansible_ssh_private_key_file: /var/lib/jenkins/.ssh/anup-training-app-key.pem
-        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes'
         instance_id: "{{ item.instance_id }}"
         private_ip: "{{ item.network_interfaces[0].private_ip_address }}"
       loop: "{{ ec2_info.instances }}"
@@ -55,6 +55,9 @@
   hosts: asg_hosts
   gather_facts: no
   become: yes
+  vars:
+    ansible_ssh_pipelining: true
+    ansible_ssh_extra_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
   tasks:
     - name: Test connectivity
       ping:

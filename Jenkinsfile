@@ -174,10 +174,36 @@ pipeline {
                 sh '''
                 pip3 install --user boto3 botocore
                 '''
+                
+                echo "🚀 Setting up Jenkins environment and SSH permissions..."
+                sh '''
+                # Set proper environment for Jenkins user
+                export HOME=/var/lib/jenkins
+                
+                # Debug: Check current user and permissions
+                whoami
+                id
+                echo "HOME: $HOME"
+                
+                # Ensure SSH directory and key permissions are correct
+                sudo chown -R jenkins:jenkins /var/lib/jenkins/.ssh || true
+                sudo chmod 700 /var/lib/jenkins/.ssh || true
+                sudo chmod 600 /var/lib/jenkins/.ssh/anup-training-app-key.pem || true
+                
+                # Check if key is readable
+                test -r /var/lib/jenkins/.ssh/anup-training-app-key.pem && echo "✅ SSH key is readable" || echo "❌ SSH key not readable"
+                '''
+                
                 echo "🚀 Running Ansible playbook to update Docker containers on all ASG instances..."
                 sh '''
+                # Set HOME environment for Jenkins user
+                export HOME=/var/lib/jenkins
+                export ANSIBLE_HOST_KEY_CHECKING=False
+                
+                # Run as jenkins user if needed
                 ansible-playbook -i localhost, asg-docker-rolling-update.yml \
-                  --extra-vars "asg_name=anup-training-dev-asg region=us-east-1"
+                --extra-vars "asg_name=anup-training-dev-asg region=us-east-1" \
+                -v
                 '''
             }
         }
